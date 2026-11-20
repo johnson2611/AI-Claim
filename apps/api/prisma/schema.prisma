@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  OFFICER
+  ADMIN
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  MORE_INFO_REQUIRED
+  REVIEWED
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  SKIPPED
+}
+
+enum AiRoute {
+  ON_DEVICE
+  IN_CLOUD
+}
+
+enum AiTask {
+  NARRATIVE_REWRITE
+  MISSING_FIELDS
+  CASE_SUMMARY
+  IMAGE_CHECK
+}
+
+enum AiStatus {
+  SUCCESS
+  FAILED
+  REJECTED_OUTPUT
+}
+
+model User {
+  id              String          @id @default(cuid())
+  identitySubject String          @unique // Firebase Auth uid
+  email           String?
+  role            Role            @default(CUSTOMER) // authoritative role: set server-side only
+  createdAt       DateTime        @default(now())
+  disabledAt      DateTime?
+  claims          ClaimCase[]
+  consents        ConsentRecord[]
+  events          ClaimEvent[]
+}
+
+model ClaimCase {
+  id                    String          @id @default(cuid())
+  publicReference       String          @unique
+  customerId            String
+  customer              User            @relation(fields: [customerId], references: [id])
+  policyReferenceMasked String?
+  incidentAt            DateTime?
+  incidentLocation      String?
+  incidentType          String?
+  narrative             String? // original customer statement: never overwritten by AI
+  vehicleDescription    String?
+  injuriesReported      Boolean?
+  otherPartiesInvolved  Boolean?
+  contactChannel        String?
+  status                ClaimStatus     @default(DRAFT)
+  aiDraft               Json? // AI output, stored separately from customer statements
+  officerSummary        String?
+  submittedAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  evidence              Evidence[]
+  analyses              AiAnalysis[]
+  consents              ConsentRecord[]
+  events                ClaimEvent[]
+
+  @@index([customerId])
+  @@index([status, submittedAt])
+}
+
+model Evidence {
+  id               String     @id @default(cuid())
+  claimId          String
+  claim            ClaimCase  @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  storageObjectKey String     @unique
+  fileName         String
+  fileType         String
+  fileSize         Int
+  label            String
+  checksum         String
+  scanStatus       ScanStatus @default(PENDING)
+  createdAt        DateTime   @default(now())
+  uploadedAt       DateTime? // set only after the object is verified in storage
+
+  @@index([claimId])
+}
+
+model AiAnalysis {
+  id                  String   @id @default(cuid())
+  claimId             String
+  claim               ClaimCase @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  taskType            AiTask
+  route               AiRoute
+  fallbackReason      String?
+  modelId             String?
+  promptVersion       String
+  outputSchemaVersion String
+  status              AiStatus
+  latencyMs           Int
+  createdAt           DateTime @default(now())
+
+  @@index([claimId])
+}
+
+model ConsentRecord {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  claimId        String
+  claim          ClaimCase @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  purpose        String
+  consentVersion String
+  grantedAt      DateTime  @default(now())
+  withdrawnAt    DateTime?
+
+  @@index([claimId, purpose])
+}
+
+model ClaimEvent {
+  id         String       @id @default(cuid())
+  claimId    String
+  claim      ClaimCase    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  actorId    String
+  actor      User         @relation(fields: [actorId], references: [id])
+  eventType  String
+  fromStatus ClaimStatus?
+  toStatus   ClaimStatus?
+  metadata   Json? // field names, routes, counts only: never claim text or images
+  createdAt  DateTime     @default(now())
+
+  @@index([claimId, createdAt])
+}
