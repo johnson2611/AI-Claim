@@ -17,6 +17,23 @@ export type AiFallbackReason = (typeof AI_FALLBACK_REASONS)[number];
 export const SAFETY_NOTICE = "AI-assisted draft. Human review required." as const;
 export const OUTPUT_SCHEMA_VERSION = "case-summary-v1";
 
+export const PHOTO_QUALITIES = ["clear", "blurry", "dark", "partial", "unclear"] as const;
+export const PHOTO_OBSERVATION_SCHEMA_VERSION = "photo-observation-v1";
+
+/** What the model returns for ONE photo. Evidence id and label are added by our code, not the model. */
+export const photoModelOutputSchema = z.object({
+  visible_description: z.string().min(1).max(500),
+  photo_quality: z.enum(PHOTO_QUALITIES),
+  matches_label: z.enum(["yes", "no", "unclear"]),
+  uncertainties: z.array(z.string().max(200)).max(5).default([]),
+});
+
+export const photoObservationSchema = photoModelOutputSchema.extend({
+  evidence_id: z.string().max(64),
+  label: z.string().max(20),
+});
+export type PhotoObservation = z.infer<typeof photoObservationSchema>;
+
 /** Output contract from the blueprint (section 8). */
 export const aiSummarySchema = z.object({
   incident_summary: z.string().max(2000),
@@ -33,6 +50,8 @@ export const aiSummarySchema = z.object({
     .max(20),
   uncertainties: z.array(z.string().max(300)).max(20),
   safety_notice: z.literal(SAFETY_NOTICE),
+  // Unverified, AI-written notes about each photo. Shown to the officer next to the real photos.
+  photo_observations: z.array(photoObservationSchema).max(12).optional(),
 });
 export type AiSummary = z.infer<typeof aiSummarySchema>;
 

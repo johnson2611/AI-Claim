@@ -17,6 +17,8 @@ export interface SummaryInput {
   otherPartiesInvolved?: boolean | null;
   narrative?: string | null;
   evidenceLabels: string[];
+  /** Unverified descriptions from the photo check, if it was run. */
+  photoNotes?: string[];
 }
 
 export class AiTaskError extends Error {
@@ -55,6 +57,7 @@ export async function generateCaseSummary(
     other_parties_involved: yesNo(input.otherPartiesInvolved),
     customer_narrative: redactIdentifiers(input.narrative ?? ""),
     photos_already_uploaded: provided.map((l) => l.toLowerCase()),
+    photo_notes_unverified: input.photoNotes ?? [],
     photos_still_missing: ALL_LABELS.filter((l) => !provided.includes(l)).map((l) => l.toLowerCase()),
   };
   const base = { task: "CASE_SUMMARY", promptVersion: PROMPT_VERSION, outputSchemaVersion: OUTPUT_SCHEMA_VERSION } as const;

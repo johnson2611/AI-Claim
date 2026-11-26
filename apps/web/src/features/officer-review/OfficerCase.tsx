@@ -67,9 +67,22 @@ export function OfficerCase() {
           <h2>AI-assisted draft (unverified)</h2>
           {claim.aiDraft ? (
             <>
-              <p>{claim.aiDraft.incident_summary}</p>
+              <p>{claim.aiDraft.incident_summary || "No text summary was drafted."}</p>
               {claim.aiDraft.missing_information.length > 0 && <><h3>Flagged as missing</h3><ul className="plain">{claim.aiDraft.missing_information.map((m) => <li key={m}>{m}</li>)}</ul></>}
               {claim.aiDraft.uncertainties.length > 0 && <><h3>Uncertainties</h3><ul className="plain">{claim.aiDraft.uncertainties.map((m) => <li key={m}>{m}</li>)}</ul></>}
+              {claim.aiDraft.photo_observations && claim.aiDraft.photo_observations.length > 0 && (
+                <>
+                  <h3>Photo observations (unverified)</h3>
+                  <ul className="plain">
+                    {claim.aiDraft.photo_observations.map((o) => (
+                      <li key={o.evidence_id}>
+                        <strong>{EVIDENCE_LABEL_TEXT[o.label as EvidenceLabel] ?? o.label}:</strong> {o.visible_description}{" "}
+                        <span className="hint">(photo looks {o.photo_quality}; matches label: {o.matches_label})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               <p className="hint">{claim.aiDraft.safety_notice}</p>
             </>
           ) : <p>The customer did not use AI help.</p>}
